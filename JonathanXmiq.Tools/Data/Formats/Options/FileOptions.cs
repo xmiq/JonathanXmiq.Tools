@@ -1,17 +1,15 @@
+﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
-namespace JonathanXmiq.Tools.DataFormats.Csv
+using System.Text;
+
+namespace JonathanXmiq.Tools.Data.Formats.Options
 {
     /// <summary>
-    /// Options Container for Handling CSV Files
+    /// Contains the options needed to parse a file
     /// </summary>
-    public class CsvFileOptions
+    public class FileOptions
     {
-        /// <summary>
-        /// The splitting / joining options character for a csv.
-        /// </summary>
-        /// <value></value>
-        public char SplitOptions { get; set; } = ',';
-
         /// <summary>
         /// Whether the Csv has headers.
         /// </summary>

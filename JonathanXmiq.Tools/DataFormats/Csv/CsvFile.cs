@@ -5,28 +5,25 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
+using JonathanXmiq.Tools.Data.Formats.Options;
+
 namespace JonathanXmiq.Tools.DataFormats.Csv
 {
     /// <summary>
     /// A handler for csv files
     /// </summary>
-     public class CsvFile : IEnumerable<CsvRow>
+    [Obsolete("Please Use JonathanXmiq.Tools.Data.Formats.CSV instead")]
+    public class CSV : JonathanXmiq.Tools.Data.File
     {
         /// <summary>
-        /// Options for reading and writing the csv file.
+        /// Gets or sets the CSV options.
         /// </summary>
-        /// <value>Options for CsvFile.</value>
-        public CsvFileOptions Options { get; set; }
-
-        /// <summary>
-        /// Row data.
-        /// </summary>
-        private CsvRow[] internalData;
-
-        /// <summary>
-        /// Header data.
-        /// </summary>
-        private CsvHeader[] internalHeaders;
+        /// <value>The CSV options.</value>
+        public CsvFileOptions CsvOptions
+        {
+            get => Options as CsvFileOptions;
+            set => Options = value;
+        }
 
         /// <summary>
         /// Loads the csv file from disk.
@@ -46,7 +43,7 @@ namespace JonathanXmiq.Tools.DataFormats.Csv
         {
             StreamReader sr = new StreamReader(fileStream);
             List<string> file = new List<string>();
-            while(fileStream.Position < fileStream.Length)
+            while (fileStream.Position < fileStream.Length)
             {
                 file.Add(sr.ReadLine());
             }
@@ -61,9 +58,9 @@ namespace JonathanXmiq.Tools.DataFormats.Csv
         {
             StreamReader sr = new StreamReader(fileStream);
             List<string> file = new List<string>();
-            while(fileStream.Position < fileStream.Length)
+            while (fileStream.Position < fileStream.Length)
             {
-                file.Add(await sr.ReadLineAsync());
+                file.Add(await sr.ReadLineAsync().ConfigureAwait(false));
             }
             ReadCsv(file.ToArray());
         }
@@ -74,64 +71,41 @@ namespace JonathanXmiq.Tools.DataFormats.Csv
         /// <param name="csv">Csv data.</param>
         public void ReadCsv(string[] csv)
         {
-            IEnumerable<string[]> rows = csv.Select(x => x.Split(Options.SplitOptions));
+            IEnumerable<string[]> rows = csv.Select(x => x.Split(CsvOptions?.SplitOptions ?? ','));
 
             if (Options.HasHeaders)
             {
-                internalHeaders = rows.FirstOrDefault()
-                    .Select(x => new CsvHeader { Name = x.Trim() })
-                    .ToArray();
+                Headers = rows.FirstOrDefault()
+                    ?.Select(x => x.Trim())
+                    ?.ToArray();
 
-                internalData = rows.Skip(1)
-                    .Select(x => new CsvRow( x.Select((y,z ) => new CsvCell(internalHeaders[z]) 
-                        {
-                            Options = this.Options,
-                            RawData = y
-                        })
-                        .ToArray()))
+                data = rows.Skip(1)
+                    .Select(x => new CsvRow(this, x))
                     .ToArray();
             }
-        }
-
-        /// <summary>
-        /// Gets the enumerator for rows in the file.
-        /// </summary>
-        /// <returns>The Enumerator.</returns>
-        public IEnumerator<CsvRow> GetEnumerator()
-        {
-            return internalData.AsEnumerable().GetEnumerator();
-        }
-
-        /// <summary>
-        /// Gets the enumerator for rows in the file.
-        /// </summary>
-        /// <returns>The Enumerator.</returns>
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return internalData.GetEnumerator();
         }
 
         /// <summary>
         /// Retrieves or sets the row at a specified column.
         /// </summary>
         /// <value>The row at the column.</value>
-
-        public IEnumerable<CsvCell> this[string Header]
+        public new IEnumerable<CsvCell> this[string Header]
         {
             get
             {
-                return internalData.Select(x => x[Header]);
+                return data.OfType<CsvRow>().Select(x => x[Header]);
             }
             set
             {
-                for(int i = 0; i < value.Count(); i++)
+                int index = GetHeaderIndex(Header);
+                for (int i = 0; i < value.Count(); i++)
                 {
                     CsvCell cell = value.ElementAt(i);
                     if (cell.Header != Header)
                     {
                         throw new InvalidProgramException("Cell header does not match row header.");
                     }
-                    internalData[i][Header] = cell;
+                    data[i][index] = cell.RawData;
                 }
             }
         }
@@ -140,22 +114,25 @@ namespace JonathanXmiq.Tools.DataFormats.Csv
         /// Retrieves or sets the row at a specified column index.
         /// </summary>
         /// <value>The row at the column index.</value>
-        public IEnumerable<CsvCell> this[int ColumnIndex]
+        public new IEnumerable<CsvCell> this[int ColumnIndex]
         {
             get
             {
-                return internalData.Select(x => x[ColumnIndex]);
+                return data.OfType<CsvRow>().Select(x => x[ColumnIndex]);
             }
             set
             {
-                for(int i = 0; i < value.Count(); i++)
+                for (int i = 0; i < value.Count(); i++)
                 {
                     CsvCell cell = value.ElementAt(i);
-                    if (cell.Header != internalData[i][ColumnIndex].Header)
+                    if (data[i] is CsvRow row)
                     {
-                        throw new InvalidProgramException("Cell header does not match row header.");
+                        if (cell.Header != row[ColumnIndex].Header)
+                        {
+                            throw new InvalidProgramException("Cell header does not match row header.");
+                        }
+                        row[ColumnIndex] = cell;
                     }
-                    internalData[i][ColumnIndex] = cell;
                 }
             }
         }
@@ -164,19 +141,20 @@ namespace JonathanXmiq.Tools.DataFormats.Csv
         /// Retrieves or sets the Cell at a specified column and row number.
         /// </summary>
         /// <value>The Cell at the column and row number.</value>
-        public CsvCell this[string Header, int RowNumber]
+        public new CsvCell this[string Header, int RowNumber]
         {
             get
             {
-                return internalData[RowNumber][Header];
+                return (data[RowNumber] as CsvRow)?[Header];
             }
             set
-            {       
+            {
                 if (Header != value.Header)
                 {
                     throw new InvalidProgramException("Cell header does not match row header.");
                 }
-                internalData[RowNumber][Header] = value;
+                if (data[RowNumber] is CsvRow row)
+                    row[Header] = value;
             }
         }
 
@@ -184,19 +162,22 @@ namespace JonathanXmiq.Tools.DataFormats.Csv
         /// Retrieves or sets the Cell at a specified column index and row number.
         /// </summary>
         /// <value>The Cell at the column index and row number.</value>
-        public CsvCell this[int ColumnIndex, int RowNumber]
+        public new CsvCell this[int ColumnIndex, int RowNumber]
         {
             get
             {
-                return internalData[RowNumber][ColumnIndex];
+                return (data[RowNumber] as CsvRow)?[ColumnIndex];
             }
             set
             {
-                if (value.Header != internalData[RowNumber][ColumnIndex].Header)
+                if (data[RowNumber] is CsvRow row)
                 {
-                    throw new InvalidProgramException("Cell header does not match row header.");
+                    if (value.Header != row[ColumnIndex].Header)
+                    {
+                        throw new InvalidProgramException("Cell header does not match row header.");
+                    }
+                    row[ColumnIndex] = value;
                 }
-                internalData[RowNumber][ColumnIndex] = value;
             }
         }
     }
