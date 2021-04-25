@@ -77,6 +77,19 @@ namespace JonathanXmiq.Tools.Data
 
         #endregion Header Methods
 
+        #region Add Row
+
+        /// <summary>
+        /// Adds new rows.
+        /// </summary>
+        /// <param name="RowData">The row data.</param>
+        public virtual void AddRow(params string[][] RowData)
+        {
+            data = data?.Concat(RowData.Select(x => new Row(this, x)))?.ToArray() ?? RowData.Select(x => new Row(this, x)).ToArray();
+        }
+
+        #endregion Add Row
+
         #region IEnumearble Methods
 
         /// <summary>

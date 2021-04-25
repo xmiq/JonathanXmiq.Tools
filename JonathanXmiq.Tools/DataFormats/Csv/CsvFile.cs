@@ -85,6 +85,11 @@ namespace JonathanXmiq.Tools.DataFormats.Csv
             }
         }
 
+        public override void AddRow(params string[][] RowData)
+        {
+            data = data?.Concat(RowData.Select(x => new CsvRow(this, x)))?.ToArray() ?? RowData.Select(x => new CsvRow(this, x)).ToArray();
+        }
+
         /// <summary>
         /// Retrieves or sets the row at a specified column.
         /// </summary>
