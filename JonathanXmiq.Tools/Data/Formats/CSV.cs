@@ -101,7 +101,7 @@ namespace JonathanXmiq.Tools.Data.Formats
             StreamWriter sw = new StreamWriter(fileStream);
             foreach (string s in WriteCsv())
             {
-                await sw.WriteLineAsync(s);
+                await sw.WriteLineAsync(s).ConfigureAwait(false);
             }
             fileStream.Position = 0;
         }
@@ -138,3 +138,4 @@ namespace JonathanXmiq.Tools.Data.Formats
             }
         }
     }
+}
